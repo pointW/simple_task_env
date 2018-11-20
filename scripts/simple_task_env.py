@@ -9,6 +9,7 @@ import vrep_arm_toolkit.utils.vrep_utils as utils
 
 VREP_BLOCKING = vrep.simx_opmode_blocking
 
+CUBE_MESH = '/home/ur5/thesis/simple_task/mesh/block.obj'
 
 class SimpleTaskEnv:
     def __init__(self):
@@ -30,12 +31,13 @@ class SimpleTaskEnv:
         time.sleep(1)
         # Generate a cube
         position = self.cube_start_position
-        orientation = [0, 0, 0]
+        orientation = [np.radians(90), 0, np.radians(90)]
         # orientation = [0, 0, 0]
         size = self.cube_size
         mass = 0.1
         color = [255, 0, 0]
-        self.cube = utils.generateShape(self.sim_client, 'cube', 0, size, position, orientation, mass, color)
+        self.cube = utils.importShape(self.sim_client, 'cube', CUBE_MESH, position, orientation, color)
+        # self.cube = utils.generateShape(self.sim_client, 'cube', 0, size, position, orientation, mass, color)
         # time.sleep(1)
 
         utils.setObjectPosition(self.sim_client, self.ur5.UR5_target, [-0.2, 0.6, 0.07])
