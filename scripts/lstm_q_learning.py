@@ -1,5 +1,6 @@
 from collections import namedtuple
 import random
+import time
 
 import numpy as np
 
@@ -74,7 +75,7 @@ class LSTMQNet(torch.nn.Module):
 
 
 class LSTMAgent:
-    def __init__(self, model, env, exploration, gamma=0.9, alpha=0.01):
+    def __init__(self, env, exploration, gamma=0.99, model=None):
         self.model = model
         self.env = env
         self.exploration = exploration
@@ -83,13 +84,13 @@ class LSTMAgent:
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.model = self.model.to(self.device)
+        if model:
+            self.model = self.model.to(self.device)
 
         self.optimizer = optim.RMSprop(self.model.parameters())
         self.memory = ReplayMemory(100)
         self.batch_size = 10
         self.gamma = gamma
-        self.alpha = alpha
 
         self.steps_done = 0
 
@@ -140,8 +141,6 @@ class LSTMAgent:
 
                 loss = loss + 0.5 * advantage.pow(2)
 
-                # loss = F.smooth_l1_loss(state_action_value, expected_state_action_value.unsqueeze(1))
-
         self.optimizer.zero_grad()
         loss.backward()
         for param in self.model.parameters():
@@ -149,8 +148,6 @@ class LSTMAgent:
         self.optimizer.step()
 
     def train(self, num_episodes, max_episode_steps=100):
-        episode_rewards = []
-        episode_lengths = []
         for episode in range(num_episodes):
             print '------Episode {} / {}------'.format(episode, num_episodes)
             self.resetHidden()
@@ -171,23 +168,62 @@ class LSTMAgent:
                 self.memory.push(state, action, next_state, reward)
                 if done or step == max_episode_steps - 1:
                     print '------Episode {} ended, total reward: {}, step: {}------'.format(episode, r_total, step)
-                    episode_rewards.append(r_total)
-                    episode_lengths.append(step)
+                    self.episode_rewards.append(r_total)
+                    self.episode_lengths.append(step)
                     self.optimizeModel()
                     if episode % 100 == 0:
-                        np.save('length', np.array(episode_lengths))
-                        np.save('reward', np.array(episode_rewards))
-                        torch.save(self.model.state_dict(), open('lstm_q.pt', 'w'))
+                        self.save_checkpoint()
                     break
                 state = next_state
-        np.save('length', np.array(episode_lengths))
-        np.save('reward', np.array(episode_rewards))
-        torch.save(self.model.state_dict(), open('lstm_q.pt', 'w'))
+        self.save_checkpoint()
+
+    # def save(self):
+    #     time_stamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
+    #     np.save('../data/lstm/length'+time_stamp, np.array(self.episode_lengths))
+    #     np.save('../data/lstm/reward'+time_stamp, np.array(self.episode_rewards))
+    #     torch.save(self.model.state_dict(), open('../data/lstm/model'+time_stamp+'.pt', 'w'))
+
+    def save_checkpoint(self):
+        time_stamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
+        filename = '../data/lstm/checkpoint' + time_stamp + 'pth.tar'
+        state = {
+            # 'episode'
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'episode_rewards': self.episode_rewards,
+            'episode_lengths': self.episode_lengths
+        }
+        torch.save(state, filename)
+
+    def load_checkpoint(self, time_stamp):
+        filename = '../data/lstm/checkpoint' + time_stamp + 'pth.tar'
+        print 'loading checkpoint: ', filename
+        checkpoint = torch.load(filename)
+        self.model = LSTMQNet()
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.model = self.model.to(self.device)
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.episode_rewards = checkpoint['episode_rewards']
+        self.episode_lengths = checkpoint['episode_lengths']
+
+    def load(self, model_path, reward_path=None, length_path=None):
+        self.model = LSTMQNet()
+        self.model.load_state_dict(torch.load(model_path))
+        self.model.train()
+        self.model = self.model.to(self.device)
+
+        if reward_path:
+            self.episode_rewards = np.load(reward_path)
+        if length_path:
+            self.episode_lengths = np.load(length_path)
 
 
 def main():
     simple_task_env = SimpleTaskEnv()
-    agent = LSTMAgent(LSTMQNet(), simple_task_env, LinearSchedule(1000, final_p=0.1))
+    exploration = LinearSchedule(1000, final_p=0.1)
+    agent = LSTMAgent(simple_task_env, exploration)
+    agent.load('../data/lstm/lstm_q.pt', reward_path='../data/lstm/reward.npy', length_path='../data/lstm/length.npy')
+
     agent.train(10000)
 
 
