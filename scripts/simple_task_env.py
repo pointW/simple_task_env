@@ -65,7 +65,7 @@ class SimpleTaskEnv:
         utils.setObjectPosition(self.sim_client, self.ur5.UR5_target, target_pose[:3, 3])
         # utils.setObjectOrientation(self.sim_client, self.ur5.UR5_target, target_pose.flatten()[:-4])
         # self.ur5.moveTo(target_pose)
-        time.sleep(0.5)
+        # time.sleep(0.5)
 
         # arm is in wrong pose
         sim_ret, tip_position = utils.getObjectPosition(self.sim_client, self.ur5.gripper_tip)
@@ -87,10 +87,10 @@ class SimpleTaskEnv:
                 res, cube_position = utils.getObjectPosition(self.sim_client, self.cube)
             # if np.any(np.array(cube_position) < np.array(self.cube_start_position) - 0.5 * np.array(self.cube_size))\
             #         or np.any(np.array(cube_position) > np.array(self.cube_start_position) + 0.5 * np.array(self.cube_size)):
-            if cube_position[0] < self.cube_start_position[0] - 0.5 * self.cube_size[0] or \
-                    cube_position[0] > self.cube_start_position[0] + 0.5 * self.cube_size[0] or\
-                    cube_position[1] < self.cube_start_position[1] - 0.5 * self.cube_size[1] or\
-                    cube_position[1] > self.cube_start_position[1] + 0.5 * self.cube_size[1]:
+            if cube_position[0] < self.cube_start_position[0] - self.cube_size[0] or \
+                    cube_position[0] > self.cube_start_position[0] + self.cube_size[0] or\
+                    cube_position[1] < self.cube_start_position[1] - self.cube_size[1] or\
+                    cube_position[1] > self.cube_start_position[1] + self.cube_size[1]:
                 print 'Wrong cube position: ', cube_position
                 return None, 0, True, None
 
