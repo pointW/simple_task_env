@@ -23,11 +23,12 @@ class ReplayMemory(object):
         self.position = 0
         
     def push(self, *args):
-        self.memory[-1].append(Transition(*args))
-        if args[2] is None:
+        if self.memory[-1] and self.memory[-1][-1].next_state is None:
             self.memory.append([])
             if len(self.memory) > self.capacity:
                 self.memory = self.memory[1:]
+
+        self.memory[-1].append(Transition(*args))
                 
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
@@ -68,9 +69,7 @@ class LSTMQNet(torch.nn.Module):
         x, (hx, cx) = inputs
         x = x.view(x.size(0), -1)
         hx, cx = self.lstm(x, (hx, cx))
-
         x = hx
-
         return self.linear(x), (hx, cx)
 
 
@@ -87,29 +86,34 @@ class LSTMAgent:
         if model:
             self.model = self.model.to(self.device)
 
-        self.optimizer = optim.RMSprop(self.model.parameters())
+        if model:
+            self.optimizer = optim.RMSprop(self.model.parameters())
         self.memory = ReplayMemory(100)
         self.batch_size = 10
         self.gamma = gamma
 
         self.steps_done = 0
+        self.episode = 0
 
-        self.hx = None
-        self.cx = None
+        self.hidden = None
         
     def resetHidden(self):
-        self.hx = torch.zeros(1, 128, device=self.device)
-        self.cx = torch.zeros(1, 128, device=self.device)
+        self.hidden = (torch.zeros(1, 128, device=self.device, requires_grad=False),
+                       torch.zeros(1, 128, device=self.device, requires_grad=False))
 
-    def selectAction(self, state):
+    def selectAction(self, state, require_q=False):
         e = self.exploration.value(self.steps_done)
         self.steps_done += 1
-        data, (self.hx, self.cx) = self.model((state, (self.hx, self.cx)))
+        with torch.no_grad():
+            q_values, self.hidden = self.model((state, self.hidden))
         if random.random() > e:
-            with torch.no_grad():
-                return data.max(1)[1].view(1, 1)
+            action = q_values.max(1)[1].view(1, 1)
         else:
-            return torch.tensor([[random.randrange(2)]], device=self.device, dtype=torch.long)
+            action = torch.tensor([[random.randrange(2)]], device=self.device, dtype=torch.long)
+        q_value = q_values.gather(1, action).item()
+        if require_q:
+            return action, q_value
+        return action
 
     def optimizeModel(self):
         if len(self.memory) < self.batch_size:
@@ -119,25 +123,24 @@ class LSTMAgent:
         loss = 0
         
         for transitions in memory:
-            hx = torch.zeros(1, 128, device=self.device)
-            cx = torch.zeros(1, 128, device=self.device)
+            hidden = (torch.zeros(1, 128, device=self.device, requires_grad=False),
+                      torch.zeros(1, 128, device=self.device, requires_grad=False))
             for transition in transitions:
                 state = transition.state
                 next_state = transition.next_state
                 reward = transition.reward
                 action = transition.action
-                values, (hx, cx) = self.model((state, (hx, cx)))
-                state_action_value = values.gather(1, action)
+                q_values, hidden = self.model((state, hidden))
+                q_value = q_values.gather(1, action)
                 if next_state is not None:
-                    hx_copy = hx.clone()
-                    cx_copy = cx.clone()
-                    values, (_, _) = self.model((next_state, (hx_copy, cx_copy)))
-                    next_state_value = values.max(1)[0].detach()
+                    hidden_clone = (hidden[0].clone(), hidden[1].clone())
+                    next_q_values, _ = self.model((next_state, hidden_clone))
+                    next_q_value = next_q_values.max(1)[0].detach()
                 else:
-                    next_state_value = torch.zeros(1, device=self.device)
-                expected_state_action_value = (next_state_value * self.gamma) + reward
+                    next_q_value = torch.zeros(1, device=self.device)
+                expected_q_value = (next_q_value * self.gamma) + reward
 
-                advantage = expected_state_action_value - state_action_value
+                advantage = expected_q_value - q_value
 
                 loss = loss + 0.5 * advantage.pow(2)
 
@@ -148,16 +151,18 @@ class LSTMAgent:
         self.optimizer.step()
 
     def train(self, num_episodes, max_episode_steps=100):
-        for episode in range(num_episodes):
-            print '------Episode {} / {}------'.format(episode, num_episodes)
+        # for episode in range(self.episode, num_episodes):
+        while self.episode < num_episodes:
+            print '------Episode {} / {}------'.format(self.episode, num_episodes)
             self.resetHidden()
             s = self.env.reset()
             state = torch.tensor(s, device=self.device).unsqueeze(0)
             r_total = 0
             for step in range(max_episode_steps):
-                action = self.selectAction(state)
+                action, q = self.selectAction(state, require_q=True)
                 s_, r, done, info = self.env.step(action.item())
-                print 'step {}, {}, {}, {}, {}, {}'.format(step, s, action.item(), s_, r, done)
+                print 'step {}, state: {}, action: {}, q: {}, next state: {}, reward: {} done: {}'\
+                    .format(step, s, action.item(), q, s_, r, done)
                 s = s_
                 r_total += r
                 if done or step == max_episode_steps - 1:
@@ -167,11 +172,12 @@ class LSTMAgent:
                 reward = torch.tensor([r], device=self.device, dtype=torch.float)
                 self.memory.push(state, action, next_state, reward)
                 if done or step == max_episode_steps - 1:
-                    print '------Episode {} ended, total reward: {}, step: {}------'.format(episode, r_total, step)
+                    print '------Episode {} ended, total reward: {}, step: {}------'.format(self.episode, r_total, step)
+                    self.episode += 1
                     self.episode_rewards.append(r_total)
                     self.episode_lengths.append(step)
                     self.optimizeModel()
-                    if episode % 100 == 0:
+                    if self.episode % 100 == 0:
                         self.save_checkpoint()
                     break
                 state = next_state
@@ -187,8 +193,11 @@ class LSTMAgent:
         time_stamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
         filename = '../data/lstm/checkpoint' + time_stamp + 'pth.tar'
         state = {
-            # 'episode'
+            'episode': self.episode,
+            'steps': self.steps_done,
             'model_state_dict': self.model.state_dict(),
+            'hidden': self.hidden,
+            'memory': self.memory,
             'optimizer_state_dict': self.optimizer.state_dict(),
             'episode_rewards': self.episode_rewards,
             'episode_lengths': self.episode_lengths
@@ -199,32 +208,37 @@ class LSTMAgent:
         filename = '../data/lstm/checkpoint' + time_stamp + 'pth.tar'
         print 'loading checkpoint: ', filename
         checkpoint = torch.load(filename)
+        self.episode = checkpoint['episode']
+        self.steps_done = checkpoint['steps']
         self.model = LSTMQNet()
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.model = self.model.to(self.device)
+        self.model.train()
+        self.hidden = checkpoint['hidden']
+        self.memory = checkpoint['memory']
+        self.optimizer = optim.RMSprop(self.model.parameters())
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.episode_rewards = checkpoint['episode_rewards']
         self.episode_lengths = checkpoint['episode_lengths']
 
-    def load(self, model_path, reward_path=None, length_path=None):
-        self.model = LSTMQNet()
-        self.model.load_state_dict(torch.load(model_path))
-        self.model.train()
-        self.model = self.model.to(self.device)
-
-        if reward_path:
-            self.episode_rewards = np.load(reward_path)
-        if length_path:
-            self.episode_lengths = np.load(length_path)
+    # def load(self, model_path, reward_path=None, length_path=None):
+    #     self.model = LSTMQNet()
+    #     self.model.load_state_dict(torch.load(model_path))
+    #     self.model.train()
+    #     self.model = self.model.to(self.device)
+    #
+    #     if reward_path:
+    #         self.episode_rewards = np.load(reward_path)
+    #     if length_path:
+    #         self.episode_lengths = np.load(length_path)
 
 
 def main():
     simple_task_env = SimpleTaskEnv()
-    exploration = LinearSchedule(1000, final_p=0.1)
+    exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
     agent = LSTMAgent(simple_task_env, exploration)
-    agent.load('../data/lstm/lstm_q.pt', reward_path='../data/lstm/reward.npy', length_path='../data/lstm/length.npy')
-
-    agent.train(10000)
+    agent.load_checkpoint('20181120235316')
+    agent.train(1000000)
 
 
 if __name__ == '__main__':
