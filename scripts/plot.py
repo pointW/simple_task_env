@@ -19,11 +19,12 @@ def plotLearningCurve(episode_rewards, window=100, label='reward', color='b'):
     plt.legend(loc=4)
 
 
-a = np.load('reward.npy')
-plotLearningCurve(a, label='lstm', color='b')
-b = np.load('../data/q_learning/reward_1000')
-plotLearningCurve(b, label='q_learning', color='r')
-plt.show()
+if __name__ == '__main__':
+    a = np.load('reward.npy')
+    plotLearningCurve(a, label='lstm', color='b')
+    b = np.load('../data/q_learning/reward_1000')
+    plotLearningCurve(b, label='q_learning', color='r')
+    plt.show()
 
 
 

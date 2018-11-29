@@ -3,6 +3,7 @@ import random
 import time
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -12,6 +13,8 @@ import torchvision.transforms as T
 
 from utils import *
 from simple_task_env import SimpleTaskEnv
+
+from plot import plotLearningCurve
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
@@ -61,16 +64,18 @@ class LSTMQNet(torch.nn.Module):
     def __init__(self):
         super(LSTMQNet, self).__init__()
 
-        self.lstm = nn.LSTMCell(1, 128)
-
-        self.linear = nn.Linear(128, 2)
+        self.fc1 = nn.Linear(1, 32)
+        self.lstm = nn.LSTMCell(32, 64)
+        self.fc2 = nn.Linear(64, 2)
 
     def forward(self, inputs):
         x, (hx, cx) = inputs
         x = x.view(x.size(0), -1)
+        x = self.fc1(x)
+        x = F.relu(x)
         hx, cx = self.lstm(x, (hx, cx))
         x = hx
-        return self.linear(x), (hx, cx)
+        return self.fc2(x), (hx, cx)
 
 
 class LSTMAgent:
@@ -87,8 +92,9 @@ class LSTMAgent:
             self.model = self.model.to(self.device)
 
         if model:
-            self.optimizer = optim.RMSprop(self.model.parameters())
-        self.memory = ReplayMemory(100)
+            # self.optimizer = optim.RMSprop(self.model.parameters())
+            self.optimizer = optim.Adam(self.model.parameters())
+        self.memory = ReplayMemory(1000)
         self.batch_size = 10
         self.gamma = gamma
 
@@ -98,8 +104,8 @@ class LSTMAgent:
         self.hidden = None
         
     def resetHidden(self):
-        self.hidden = (torch.zeros(1, 128, device=self.device, requires_grad=False),
-                       torch.zeros(1, 128, device=self.device, requires_grad=False))
+        return (torch.zeros(1, 64, device=self.device, requires_grad=False),
+                torch.zeros(1, 64, device=self.device, requires_grad=False))
 
     def selectAction(self, state, require_q=False):
         e = self.exploration.value(self.steps_done)
@@ -123,8 +129,7 @@ class LSTMAgent:
         loss = 0
         
         for transitions in memory:
-            hidden = (torch.zeros(1, 128, device=self.device, requires_grad=False),
-                      torch.zeros(1, 128, device=self.device, requires_grad=False))
+            hidden = self.resetHidden()
             for transition in transitions:
                 state = transition.state
                 next_state = transition.next_state
@@ -154,7 +159,7 @@ class LSTMAgent:
         # for episode in range(self.episode, num_episodes):
         while self.episode < num_episodes:
             print '------Episode {} / {}------'.format(self.episode, num_episodes)
-            self.resetHidden()
+            self.hidden = self.resetHidden()
             s = self.env.reset()
             state = torch.tensor(s, device=self.device).unsqueeze(0)
             r_total = 0
@@ -236,9 +241,15 @@ class LSTMAgent:
 def main():
     simple_task_env = SimpleTaskEnv()
     exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
-    agent = LSTMAgent(simple_task_env, exploration)
-    agent.load_checkpoint('20181120235316')
-    agent.train(1000000)
+    agent = LSTMAgent(simple_task_env, exploration, model=LSTMQNet())
+    agent.train(10000)
+
+    # agent = LSTMAgent(None, None)
+    # agent.load_checkpoint('20181127140856')
+    # plotLearningCurve(agent.episode_rewards)
+    # plotLearningCurve(agent.episode_lengths, label='length', color='r')
+    # plt.show()
+    # pass
 
 
 if __name__ == '__main__':
