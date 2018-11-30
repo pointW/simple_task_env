@@ -221,7 +221,7 @@ class LSTMAgent:
         self.model.train()
         self.hidden = checkpoint['hidden']
         self.memory = checkpoint['memory']
-        self.optimizer = optim.RMSprop(self.model.parameters())
+        self.optimizer = optim.Adam(self.model.parameters())
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.episode_rewards = checkpoint['episode_rewards']
         self.episode_lengths = checkpoint['episode_lengths']
