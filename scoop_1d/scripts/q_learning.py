@@ -1,12 +1,8 @@
-import sys
-import time
 from collections import defaultdict
-
-import numpy as np
 
 from simple_task_env import SimpleTaskEnv
 
-from utils import *
+from util.utils import *
 
 
 def q_learning(env, num_episodes, gamma=1.0, alpha=0.1,

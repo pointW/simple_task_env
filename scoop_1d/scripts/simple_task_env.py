@@ -13,7 +13,7 @@ CUBE_MESH = '/home/ur5/thesis/simple_task/mesh/block.obj'
 
 class SimpleTaskEnv:
     def __init__(self):
-        self.sim_client = utils.connectToSimulation('127.0.0.1', 19997)
+        self.sim_client = utils.connectToSimulation('127.0.0.1', 19998)
 
         # Create UR5 and restart simulator
         self.rdd = RDD(self.sim_client, open_force=10)

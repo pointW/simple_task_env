@@ -2,19 +2,13 @@ from collections import namedtuple
 import random
 import time
 
-import numpy as np
-import matplotlib.pyplot as plt
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import torchvision.transforms as T
 
-from utils import *
+from util.utils import *
 from simple_task_env import SimpleTaskEnv
-
-from plot import plotLearningCurve
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
