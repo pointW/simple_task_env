@@ -1,6 +1,7 @@
 from collections import namedtuple
 import random
 import time
+import os
 
 import torch
 import torch.nn as nn
@@ -8,7 +9,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from util.utils import *
-from simple_task_env import SimpleTaskEnv
+from scoop_1d_env import ScoopEnv
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
@@ -189,8 +190,9 @@ class LSTMAgent:
     #     torch.save(self.model.state_dict(), open('../data/lstm/model'+time_stamp+'.pt', 'w'))
 
     def save_checkpoint(self):
+        saving_dir = '/home/ur5/thesis/simple_task/scoop_1d/data/lstm'
         time_stamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
-        filename = '../data/lstm/checkpoint' + time_stamp + 'pth.tar'
+        filename = os.path.join(saving_dir, 'checkpoint' + time_stamp + 'pth.tar')
         state = {
             'episode': self.episode,
             'steps': self.steps_done,
@@ -204,7 +206,8 @@ class LSTMAgent:
         torch.save(state, filename)
 
     def load_checkpoint(self, time_stamp):
-        filename = '../data/lstm/checkpoint' + time_stamp + 'pth.tar'
+        saving_dir = '/home/ur5/thesis/simple_task/scoop_1d/data/lstm'
+        filename = os.path.join(saving_dir, 'checkpoint' + time_stamp + 'pth.tar')
         print 'loading checkpoint: ', filename
         checkpoint = torch.load(filename)
         self.episode = checkpoint['episode']
@@ -233,7 +236,7 @@ class LSTMAgent:
 
 
 def main():
-    simple_task_env = SimpleTaskEnv()
+    simple_task_env = ScoopEnv()
     exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
     agent = LSTMAgent(simple_task_env, exploration, model=LSTMQNet())
     agent.train(10000)

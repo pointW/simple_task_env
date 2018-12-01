@@ -11,9 +11,10 @@ VREP_BLOCKING = vrep.simx_opmode_blocking
 
 CUBE_MESH = '/home/ur5/thesis/simple_task/mesh/block.obj'
 
-class SimpleTaskEnv:
-    def __init__(self):
-        self.sim_client = utils.connectToSimulation('127.0.0.1', 19998)
+
+class ScoopEnv:
+    def __init__(self, port=19997):
+        self.sim_client = utils.connectToSimulation('127.0.0.1', port)
 
         # Create UR5 and restart simulator
         self.rdd = RDD(self.sim_client, open_force=10)
@@ -99,7 +100,7 @@ class SimpleTaskEnv:
 
 
 if __name__ == '__main__':
-    env = SimpleTaskEnv()
+    env = ScoopEnv(port=19997)
     env.reset()
     while True:
         a = input('input action')

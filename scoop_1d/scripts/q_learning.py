@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from simple_task_env import SimpleTaskEnv
+from scoop_1d_env import ScoopEnv
 
 from util.utils import *
 
@@ -59,7 +59,7 @@ def q_learning(env, num_episodes, gamma=1.0, alpha=0.1,
 
 
 def main():
-    simple_task_env = SimpleTaskEnv()
+    simple_task_env = ScoopEnv()
     q_table, rewards, lengths = q_learning(simple_task_env, 1000, gamma=0.9)
 
 
