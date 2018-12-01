@@ -97,7 +97,7 @@ class DQNAgent:
         if random.random() > e:
             action = q_values.max(1)[1].view(1, 1)
         else:
-            action = torch.tensor([[random.randrange(2)]], device=self.device, dtype=torch.long)
+            action = torch.tensor([[random.randrange(self.env.nA)]], device=self.device, dtype=torch.long)
         q_value = q_values.gather(1, action).item()
         if require_q:
             return action, q_value
