@@ -210,11 +210,20 @@ class HisDQNAgent:
 
 
 def main():
-    simple_task_env = SimpleTaskEnv()
-    exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
-    agent = HisDQNAgent(simple_task_env, exploration)
-    agent.load_checkpoint('20181130173501')
-    agent.train(10000)
+    # simple_task_env = SimpleTaskEnv()
+    # exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
+    # agent = HisDQNAgent(simple_task_env, exploration)
+    # agent.load_checkpoint('20181201155006')
+    # agent.train(10000)
+
+    agent = HisDQNAgent(None, None)
+    agent.load_checkpoint('20181201155006')
+    plotLearningCurve(agent.episode_rewards)
+    plt.show()
+    plotLearningCurve(agent.episode_lengths, label='length', color='r')
+    plt.show()
+    pass
+
 
 if __name__ == '__main__':
     main()
