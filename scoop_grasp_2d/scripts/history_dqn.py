@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../..')
+
 from util.utils import LinearSchedule
 from agent.dqn import *
 from scoop_2d_env import ScoopEnv
@@ -39,6 +42,14 @@ class HisDQNAgent(DQNAgent):
 
 
 if __name__ == '__main__':
-    agent = HisDQNAgent(HistoryDQN, model=HistoryDQN(), env=ScoopEnv(port=19999),
-                        exploration=LinearSchedule(1000, initial_p=1.0, final_p=0.1))
-    agent.train(10000)
+    # agent = HisDQNAgent(HistoryDQN, model=HistoryDQN(), env=ScoopEnv(port=19999),
+    #                     exploration=LinearSchedule(1000, initial_p=1.0, final_p=0.1))
+    # agent.train(10000)
+
+    agent = HisDQNAgent(HistoryDQN)
+    agent.load_checkpoint('20181203133359')
+    plotLearningCurve(agent.episode_rewards)
+    plt.show()
+    plotLearningCurve(agent.episode_lengths, label='length', color='r')
+    plt.show()
+    pass
