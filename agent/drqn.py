@@ -1,32 +1,32 @@
 from collections import namedtuple
 import random
 import time
-from abc import abstractmethod
 import os
-
-import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-from util.plot import plotLearningCurve
+from util.utils import *
+from dqn import DQNAgent
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
 
-class ReplayMemory(object):
+class EpisodicReplayMemory(object):
     def __init__(self, capacity):
         self.capacity = capacity
-        self.memory = []
+        self.memory = [[]]
         self.position = 0
 
     def push(self, *args):
-        if len(self.memory) < self.capacity:
-            self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
-        self.position = (self.position + 1) % self.capacity
+        if self.memory[-1] and self.memory[-1][-1].next_state is None:
+            self.memory.append([])
+            if len(self.memory) > self.capacity:
+                self.memory = self.memory[1:]
+
+        self.memory[-1].append(Transition(*args))
 
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
@@ -35,11 +35,11 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-class DQNAgent:
+class DRQNAgent(DQNAgent):
     def __init__(self, model_class, model=None, env=None, exploration=None,
                  gamma=0.99, memory_size=10000, batch_size=64, target_update_frequency=10, saving_dir=None):
         """
-        base class for dqn agent
+        base class for lstm dqn agent
         :param model_class: sub class of torch.nn.Module. class reference of the model
         :param model: initial model of the policy net. could be None if loading from checkpoint
         :param env: environment
@@ -50,131 +50,75 @@ class DQNAgent:
         :param target_update_frequency: the frequency for updating target net (in episode)
         :param saving_dir: the directory for saving checkpoint
         """
-        self.model_class = model_class
+        DQNAgent.__init__(self, model_class, model, env, exploration, gamma, memory_size, batch_size,
+                          target_update_frequency, saving_dir)
+        self.memory = EpisodicReplayMemory(memory_size)
+        self.hidden_size = 0
+        if self.policy_net:
+            self.hidden_size = self.policy_net.hidden_size
+        self.hidden = None
 
-        self.env = env
-        self.exploration = exploration
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        self.policy_net = None
-        self.target_net = None
-        self.optimizer = None
-
-        if model:
-            self.policy_net = model
-            self.target_net = self.model_class()
-            self.target_net.load_state_dict(self.policy_net.state_dict())
-            self.policy_net = self.policy_net.to(self.device)
-            self.target_net = self.target_net.to(self.device)
-            self.target_net.eval()
-            self.optimizer = optim.Adam(self.policy_net.parameters())
-
-        self.memory = ReplayMemory(memory_size)
-        self.batch_size = batch_size
-        self.gamma = gamma
-        self.target_update = target_update_frequency
-
-        self.steps_done = 0
-        self.episodes_done = 0
-
-        self.episode_rewards = []
-        self.episode_lengths = []
-
-        self.saving_dir = saving_dir
+    def resetHidden(self):
+        return (torch.zeros(1, self.hidden_size, device=self.device, requires_grad=False),
+                torch.zeros(1, self.hidden_size, device=self.device, requires_grad=False))
 
     def forwardPolicyNet(self, state):
         with torch.no_grad():
-            q_values = self.policy_net(state)
+            q_values, self.hidden = self.policy_net((state, self.hidden))
             return q_values
 
-    def selectAction(self, state, require_q=False):
-        """
-        select action base on e-greedy policy
-        :param state: the state input tensor for the network
-        :param require_q: if True, return (action, q) else return action only
-        :return: (1x1 tensor) action [, (float) q]
-        """
-        e = self.exploration.value(self.steps_done)
-        self.steps_done += 1
-        with torch.no_grad():
-            q_values = self.forwardPolicyNet(state)
-        if random.random() > e:
-            action = q_values.max(1)[1].view(1, 1)
-        else:
-            action = torch.tensor([[random.randrange(self.env.nA)]], device=self.device, dtype=torch.long)
-        q_value = q_values.gather(1, action).item()
-        if require_q:
-            return action, q_value
-        return action
-
     def optimizeModel(self):
-        """
-        one step update for the model
-        :return: None
-        """
         if len(self.memory) < self.batch_size:
             return
-        transitions = self.memory.sample(self.batch_size)
-        mini_batch = Transition(*zip(*transitions))
-        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                                mini_batch.next_state)), device=self.device, dtype=torch.uint8)
-        non_final_next_states = torch.cat([s for s in mini_batch.next_state
-                                           if s is not None])
-        state_batch = torch.cat(mini_batch.state)
-        action_batch = torch.cat(mini_batch.action)
-        reward_batch = torch.cat(mini_batch.reward)
+        memory = self.memory.sample(self.batch_size)
 
-        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
+        loss = 0
 
-        next_state_values = torch.zeros(self.batch_size, device=self.device)
-        next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
+        for transitions in memory:
+            hidden = self.resetHidden()
+            for transition in transitions:
+                state = transition.state
+                next_state = transition.next_state
+                reward = transition.reward
+                action = transition.action
+                q_values, hidden = self.policy_net((state, hidden))
+                q_value = q_values.gather(1, action)
+                if next_state is not None:
+                    hidden_clone = (hidden[0].clone(), hidden[1].clone())
+                    next_q_values, _ = self.target_net((next_state, hidden_clone))
+                    next_q_value = next_q_values.max(1)[0].detach()
+                else:
+                    next_q_value = torch.zeros(1, device=self.device)
+                expected_q_value = (next_q_value * self.gamma) + reward
 
-        expected_state_action_values = (next_state_values * self.gamma) + reward_batch
+                advantage = expected_q_value - q_value
 
-        loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
+                loss = loss + 0.5 * advantage.pow(2)
 
         self.optimizer.zero_grad()
         loss.backward()
         for param in self.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
-            self.optimizer.step()
-
-    @abstractmethod
-    def encodeState(self, *args):
-        """
-        abstract method for encoding state
-        :param args:
-        :return:
-        """
-        pass
-
-    @abstractmethod
-    def initialState(self, *args):
-        """
-        abstract method for getting the initial state
-        :param args:
-        :return:
-        """
-        pass
+        self.optimizer.step()
 
     def train(self, num_episodes, max_episode_steps=100):
         while self.episodes_done < num_episodes:
             print '------Episode {} / {}------'.format(self.episodes_done, num_episodes)
+            self.hidden = self.resetHidden()
             s = self.env.reset()
-            state = self.initialState(s)
+            state = torch.tensor(s, device=self.device).unsqueeze(0)
             r_total = 0
             for step in range(max_episode_steps):
                 action, q = self.selectAction(state, require_q=True)
                 s_, r, done, info = self.env.step(action.item())
-                print 'step {}, observation: {}, action: {}, q: {}, next observation: {}, reward: {} done: {}'\
+                print 'step {}, state: {}, action: {}, q: {}, next state: {}, reward: {} done: {}'\
                     .format(step, s, action.item(), q, s_, r, done)
-                r_total += r
                 s = s_
+                r_total += r
                 if done or step == max_episode_steps - 1:
                     next_state = None
                 else:
-                    next_state = self.encodeState(s_, state)
+                    next_state = torch.tensor(s_, device=self.device).unsqueeze(0)
                 reward = torch.tensor([r], device=self.device, dtype=torch.float)
                 self.memory.push(state, action, next_state, reward)
                 self.optimizeModel()
@@ -193,10 +137,6 @@ class DQNAgent:
         self.save_checkpoint()
 
     def save_checkpoint(self):
-        """
-        save checkpoint in self.saving_dir
-        :return: None
-        """
         time_stamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
         filename = os.path.join(self.saving_dir, 'checkpoint' + time_stamp + '.pth.tar')
         state = {
@@ -204,6 +144,8 @@ class DQNAgent:
             'steps': self.steps_done,
             'policy_state_dict': self.policy_net.state_dict(),
             'target_state_dict': self.target_net.state_dict(),
+            'hidden': self.hidden,
+            'hidden_size': self.hidden_size,
             'memory': self.memory,
             'optimizer_state_dict': self.optimizer.state_dict(),
             'episode_rewards': self.episode_rewards,
@@ -212,16 +154,13 @@ class DQNAgent:
         torch.save(state, filename)
 
     def load_checkpoint(self, time_stamp):
-        """
-        load checkpoint at input time stamp
-        :param time_stamp: time stamp for the checkpoint
-        :return: None
-        """
         filename = os.path.join(self.saving_dir, 'checkpoint' + time_stamp + '.pth.tar')
         print 'loading checkpoint: ', filename
         checkpoint = torch.load(filename)
         self.episodes_done = checkpoint['episode']
         self.steps_done = checkpoint['steps']
+        self.hidden = checkpoint['hidden']
+        self.hidden_size = checkpoint['hidden_size']
         self.memory = checkpoint['memory']
         self.episode_rewards = checkpoint['episode_rewards']
         self.episode_lengths = checkpoint['episode_lengths']
@@ -232,7 +171,7 @@ class DQNAgent:
         self.policy_net.train()
 
         self.target_net = self.model_class()
-        self.target_net.load_state_dict(checkpoint['policy_state_dict'])
+        self.target_net.load_state_dict(checkpoint['target_state_dict'])
         self.target_net = self.target_net.to(self.device)
         self.target_net.eval()
 
