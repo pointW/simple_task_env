@@ -29,7 +29,10 @@ class EpisodicReplayMemory(object):
         self.memory[-1].append(Transition(*args))
 
     def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+        if self.memory[-1] and self.memory[-1][-1].next_state is None:
+            return random.sample(self.memory, batch_size)
+        else:
+            return random.sample(self.memory[:-1], batch_size)
 
     def __len__(self):
         return len(self.memory)
