@@ -42,14 +42,15 @@ class HisDQNAgent(DQNAgent):
 
 
 if __name__ == '__main__':
-    # agent = HisDQNAgent(HistoryDQN, model=HistoryDQN(), env=ScoopEnv(port=19999),
-    #                     exploration=LinearSchedule(1000, initial_p=1.0, final_p=0.1))
-    # agent.train(10000)
+    agent = HisDQNAgent(HistoryDQN, model=HistoryDQN(), env=ScoopEnv(port=19999),
+                        exploration=LinearSchedule(100000, initial_p=1.0, final_p=0.1))
+    agent.load_checkpoint('20181204175505')
+    agent.train(10000)
 
-    agent = HisDQNAgent(HistoryDQN)
-    agent.load_checkpoint('20181203133359')
-    plotLearningCurve(agent.episode_rewards)
-    plt.show()
-    plotLearningCurve(agent.episode_lengths, label='length', color='r')
-    plt.show()
-    pass
+    # agent = HisDQNAgent(HistoryDQN)
+    # agent.load_checkpoint('20181204144025')
+    # plotLearningCurve(agent.episode_rewards)
+    # plt.show()
+    # plotLearningCurve(agent.episode_lengths, label='length', color='r')
+    # plt.show()
+    # pass

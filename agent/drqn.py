@@ -71,7 +71,7 @@ class DRQNAgent(DQNAgent):
             return q_values
 
     def optimizeModel(self):
-        if len(self.memory) < self.batch_size:
+        if len(self.memory) < self.batch_size + 1:
             return
         memory = self.memory.sample(self.batch_size)
 
@@ -114,8 +114,8 @@ class DRQNAgent(DQNAgent):
             for step in range(max_episode_steps):
                 action, q = self.selectAction(state, require_q=True)
                 s_, r, done, info = self.env.step(action.item())
-                print 'step {}, state: {}, action: {}, q: {}, next state: {}, reward: {} done: {}'\
-                    .format(step, s, action.item(), q, s_, r, done)
+                print 'step {}, action: {}, q: {}, reward: {} done: {}' \
+                    .format(step, action.item(), q, r, done)
                 s = s_
                 r_total += r
                 if done or step == max_episode_steps - 1:
@@ -127,7 +127,10 @@ class DRQNAgent(DQNAgent):
                 self.optimizeModel()
 
                 if done or step == max_episode_steps - 1:
-                    print '------Episode {} ended, total reward: {}, step: {}------'.format(self.episodes_done, r_total, step)
+                    print '------Episode {} ended, total reward: {}, step: {}------'\
+                        .format(self.episodes_done, r_total, step)
+                    print '------Total steps done: {}, current e: {} ------' \
+                        .format(self.steps_done, self.exploration.value(self.steps_done))
                     self.episodes_done += 1
                     self.episode_rewards.append(r_total)
                     self.episode_lengths.append(step)
