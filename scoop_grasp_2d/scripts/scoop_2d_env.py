@@ -89,17 +89,15 @@ class ScoopEnv:
             utils.setObjectPosition(self.sim_client, self.ur5.UR5_target, target_pose[:3, 3])
 
         elif a == self.CLOSE:
-            closed = self.rdd.close()
-            if not closed:
-                sim_ret, cube_orientation = utils.getObjectOrientation(self.sim_client, self.cube)
+            sim_ret, cube_orientation = utils.getObjectOrientation(self.sim_client, self.cube)
 
-                sim_ret, cube_position = utils.getObjectPosition(self.sim_client, self.cube)
-                sim_ret, tip_position = utils.getObjectPosition(self.sim_client, self.ur5.gripper_tip)
+            sim_ret, cube_position = utils.getObjectPosition(self.sim_client, self.cube)
+            sim_ret, tip_position = utils.getObjectPosition(self.sim_client, self.ur5.gripper_tip)
 
-                if np.all(tip_position > (np.array(cube_position) - np.array(self.cube_size))) and \
-                        np.all(tip_position < (np.array(cube_position) + np.array(self.cube_size))) and \
-                        cube_orientation[0] < -0.02:
-                    return None, 1, True, None
+            if np.all(tip_position > (np.array(cube_position) - np.array(self.cube_size))) and \
+                    np.all(tip_position < (np.array(cube_position) + np.array(self.cube_size))) and \
+                    (cube_orientation[0] < -0.02 or cube_position[2] > self.cube_start_position[2] + 0.005):
+                return None, 1, True, None
             self.rdd.open(self.open_position)
 
         # arm is in wrong pose
@@ -123,13 +121,45 @@ class ScoopEnv:
             # cube is not lifted
             return self.getState(), 0, False, None
 
+    def planAction(self):
+        sim_ret, target_position = utils.getObjectPosition(self.sim_client, self.ur5.UR5_target)
+        # step 1: move to bottom
+        if target_position[2] > 0.06:
+            return self.DOWN
+
+        elif target_position[2] < 0.05:
+            return self.UP
+
+        # step 2: move to left
+        elif target_position[1] < 0.79:
+            return self.LEFT
+
+        elif target_position[1] > 0.8:
+            return self.RIGHT
+
+        # step 3: close
+        else:
+            return self.CLOSE
+
 
 if __name__ == '__main__':
-    env = ScoopEnv(port=19999)
+    env = ScoopEnv(port=20010)
     env.reset()
+    # while True:
+    #     a = input('input action')
+    #     s_, r, done, info = env.step(int(a))
+    #     sim_ret, tip_position = utils.getObjectPosition(env.sim_client, env.ur5.gripper_tip)
+    #     print s_, r, done
+    #     print tip_position
+    #     if done:
+    #         break
+
     while True:
-        a = input('input action')
-        s_, r, done, info = env.step(int(a))
+        a = env.planAction()
+        s_, r, done, info = env.step(a)
+        sim_ret, tip_position = utils.getObjectPosition(env.sim_client, env.ur5.gripper_tip)
         print s_, r, done
+        print tip_position
         if done:
             break
+
