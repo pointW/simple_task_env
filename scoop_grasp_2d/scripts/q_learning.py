@@ -8,6 +8,19 @@ from collections import defaultdict
 from scoop_2d_env import ScoopEnv
 
 from util.utils import *
+from util.plot import *
+import json
+
+
+
+def saveJson(Q):
+    time_stamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
+    json_path = '/home/ur5/thesis/simple_task/scoop_grasp_2d/data/q_learning/' + time_stamp + 'Q'
+    json_q = {}
+    for state in Q:
+        json_q[str(state)] = list(Q[state])
+    f = open(json_path, 'w')
+    json.dump(json_q, f)
 
 
 def q_learning(env, num_episodes, gamma=1.0, alpha=0.01,
@@ -67,15 +80,19 @@ def q_learning(env, num_episodes, gamma=1.0, alpha=0.01,
                     length_path = '/home/ur5/thesis/simple_task/scoop_grasp_2d/data/q_learning/'+time_stamp+'length'
                     np.save(reward_path, episode_rewards)
                     np.save(length_path, episode_lengths)
+                    saveJson(Q)
                 break
 
     return Q, episode_rewards, episode_lengths
 
 
 def main():
-    simple_task_env = ScoopEnv(port=20011)
-    q_table, rewards, lengths = q_learning(simple_task_env, 10000, gamma=0.9)
+    # simple_task_env = ScoopEnv(port=20011)
+    # q_table, rewards, lengths = q_learning(simple_task_env, 10000, gamma=0.9)
 
+    rewards = np.load('/home/ur5/thesis/simple_task/scoop_grasp_2d/data/q_learning/20181207161441reward.npy')
+    plotLearningCurve(rewards)
+    plt.show()
 
 if __name__ == '__main__':
     main()

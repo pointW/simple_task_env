@@ -13,25 +13,32 @@ class HistoryDQNWithPlannerAgent(HisDQNAgent):
         self.steps_done += 1
         with torch.no_grad():
             q_values = self.forwardPolicyNet(state)
-        if random.random() > e:
-            action = q_values.max(1)[1].view(1, 1)
+
+        if planner:
+            a = self.env.planAction()
+            action = torch.tensor([[a]], device=self.device, dtype=torch.long)
+
         else:
-            if planner:
-                a = self.env.planAction()
+            if random.random() > e:
+                action = q_values.max(1)[1].view(1, 1)
             else:
                 a = random.randrange(self.env.nA)
-            action = torch.tensor([[a]], device=self.device, dtype=torch.long)
+                action = torch.tensor([[a]], device=self.device, dtype=torch.long)
+
         q_value = q_values.gather(1, action).item()
         if require_q:
             return action, q_value
         return action
 
-    def train(self, num_episodes, max_episode_steps=100):
+    def train(self, num_episodes, max_episode_steps=100, planning_episodes=500):
         use_planner = True
+        starting_episode = self.episodes_done
         while self.episodes_done < num_episodes:
-            if self.episodes_done > 1000:
+            if self.episodes_done > starting_episode + planning_episodes:
                 use_planner = False
             print '------Episode {} / {}------'.format(self.episodes_done, num_episodes)
+            if use_planner:
+                print '------Planning episode {} / {}'.format(self.episodes_done - starting_episode, planning_episodes)
             s = self.env.reset()
             state = self.initialState(s)
             r_total = 0
@@ -70,11 +77,11 @@ class HistoryDQNWithPlannerAgent(HisDQNAgent):
 if __name__ == '__main__':
     # agent = HistoryDQNWithPlannerAgent(HistoryDQN, model=HistoryDQN(), env=ScoopEnv(port=20010),
     #                                    exploration=LinearSchedule(10000, initial_p=1.0, final_p=0.1), batch_size=128)
-    # agent.load_checkpoint('20181206143926')
-    # agent.train(10000)
+    # agent.load_checkpoint('20181206220907')
+    # agent.train(10000, planning_episodes=0)
 
     agent = HistoryDQNWithPlannerAgent(HistoryDQN)
-    agent.load_checkpoint('20181206143926')
+    agent.load_checkpoint('20181207165154')
     plotLearningCurve(agent.episode_rewards)
     plt.show()
     plotLearningCurve(agent.episode_lengths, label='length', color='r')

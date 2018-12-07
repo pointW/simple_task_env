@@ -17,6 +17,10 @@ from worker import worker
 from scoop_grasp_2d.scripts.scoop_2d_env import ScoopEnv
 from util.utils import LinearSchedule
 
+import matplotlib.pyplot as plt
+from util.plot import plotLearningCurve
+
+
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -177,7 +181,7 @@ class SynDQNAgent:
         loss.backward()
         for param in self.policy_net.parameters():
             param.grad.data.clamp_(-1, 1)
-            self.optimizer.step()
+        self.optimizer.step()
 
     def train(self, num_episodes, max_episode_steps=200):
         while self.episodes_done < num_episodes:
@@ -246,9 +250,12 @@ class SynDQNAgent:
 if __name__ == '__main__':
     agent = SynDQNAgent(20005, 4, LinearSchedule(10000, 0.1), batch_size=256,
                         saving_dir='/home/ur5/thesis/simple_task/scoop_grasp_2d/data/sync_dqn')
-    agent.load_checkpoint('20181205014300')
-    agent.train(10000)
-
+    agent.load_checkpoint('20181205143445')
+    # agent.train(10000)
+    plotLearningCurve(agent.episode_rewards)
+    plt.show()
+    plotLearningCurve(agent.episode_lengths, label='length', color='r')
+    plt.show()
 
 
 

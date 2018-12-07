@@ -89,6 +89,7 @@ class ScoopEnv:
             utils.setObjectPosition(self.sim_client, self.ur5.UR5_target, target_pose[:3, 3])
 
         elif a == self.CLOSE:
+            self.rdd.close()
             sim_ret, cube_orientation = utils.getObjectOrientation(self.sim_client, self.cube)
 
             sim_ret, cube_position = utils.getObjectPosition(self.sim_client, self.cube)
@@ -143,23 +144,23 @@ class ScoopEnv:
 
 
 if __name__ == '__main__':
-    env = ScoopEnv(port=20010)
+    env = ScoopEnv(port=20020)
     env.reset()
-    # while True:
-    #     a = input('input action')
-    #     s_, r, done, info = env.step(int(a))
-    #     sim_ret, tip_position = utils.getObjectPosition(env.sim_client, env.ur5.gripper_tip)
-    #     print s_, r, done
-    #     print tip_position
-    #     if done:
-    #         break
-
     while True:
-        a = env.planAction()
-        s_, r, done, info = env.step(a)
+        a = input('input action')
+        s_, r, done, info = env.step(int(a))
         sim_ret, tip_position = utils.getObjectPosition(env.sim_client, env.ur5.gripper_tip)
         print s_, r, done
         print tip_position
         if done:
             break
+
+    # while True:
+    #     a = env.planAction()
+    #     s_, r, done, info = env.step(a)
+    #     sim_ret, tip_position = utils.getObjectPosition(env.sim_client, env.ur5.gripper_tip)
+    #     print s_, r, done
+    #     print tip_position
+    #     if done:
+    #         break
 

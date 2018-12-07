@@ -10,8 +10,8 @@ class LSTMQNet(torch.nn.Module):
     def __init__(self):
         super(LSTMQNet, self).__init__()
 
-        self.fc1 = nn.Linear(4, 128)
-        self.lstm = nn.LSTMCell(128, 64)
+        self.fc1 = nn.Linear(4, 32)
+        self.lstm = nn.LSTMCell(32, 64)
         self.fc2 = nn.Linear(64, 5)
 
         self.hidden_size = 64
@@ -35,14 +35,15 @@ class LSTMDQNAgent(DRQNAgent):
 
 
 if __name__ == '__main__':
-    agent = LSTMDQNAgent(LSTMQNet, model=LSTMQNet(), env=ScoopEnv(port=20000),
-                         exploration=LinearSchedule(100000, initial_p=1.0, final_p=0.1), batch_size=1)
-    agent.train(10000)
+    # agent = LSTMDQNAgent(LSTMQNet, model=LSTMQNet(), env=ScoopEnv(port=20000),
+    #                      exploration=LinearSchedule(100000, initial_p=1.0, final_p=0.1), batch_size=1)
+    # agent.load_checkpoint('20181206211529')
+    # agent.train(10000)
 
-    # agent = LSTMDQNAgent(LSTMQNet)
-    # agent.load_checkpoint('20181204143636')
-    # plotLearningCurve(agent.episode_rewards)
-    # plt.show()
-    # plotLearningCurve(agent.episode_lengths, label='length', color='r')
-    # plt.show()
+    agent = LSTMDQNAgent(LSTMQNet)
+    agent.load_checkpoint('20181207162105')
+    plotLearningCurve(agent.episode_rewards)
+    plt.show()
+    plotLearningCurve(agent.episode_lengths, label='length', color='r')
+    plt.show()
 
