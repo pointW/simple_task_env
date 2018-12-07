@@ -1,3 +1,4 @@
+import sys
 from collections import namedtuple
 import random
 import time
@@ -7,6 +8,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+
+sys.path.append('../..')
 
 from util.utils import *
 from scoop_1d_env import ScoopEnv
@@ -90,7 +93,7 @@ class LSTMAgent:
             # self.optimizer = optim.RMSprop(self.model.parameters())
             self.optimizer = optim.Adam(self.model.parameters())
         self.memory = ReplayMemory(1000)
-        self.batch_size = 10
+        self.batch_size = 1
         self.gamma = gamma
 
         self.steps_done = 0
@@ -192,7 +195,7 @@ class LSTMAgent:
     def save_checkpoint(self):
         saving_dir = '/home/ur5/thesis/simple_task/scoop_1d/data/lstm'
         time_stamp = time.strftime('%Y%m%d%H%M%S', time.gmtime())
-        filename = os.path.join(saving_dir, 'checkpoint' + time_stamp + 'pth.tar')
+        filename = os.path.join(saving_dir, 'checkpoint' + time_stamp + '.pth.tar')
         state = {
             'episode': self.episode,
             'steps': self.steps_done,
@@ -207,7 +210,7 @@ class LSTMAgent:
 
     def load_checkpoint(self, time_stamp):
         saving_dir = '/home/ur5/thesis/simple_task/scoop_1d/data/lstm'
-        filename = os.path.join(saving_dir, 'checkpoint' + time_stamp + 'pth.tar')
+        filename = os.path.join(saving_dir, 'checkpoint' + time_stamp + '.pth.tar')
         print 'loading checkpoint: ', filename
         checkpoint = torch.load(filename)
         self.episode = checkpoint['episode']
@@ -236,9 +239,10 @@ class LSTMAgent:
 
 
 def main():
-    simple_task_env = ScoopEnv()
-    exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
+    simple_task_env = ScoopEnv(port=19998)
+    exploration = LinearSchedule(1000, 0.1)
     agent = LSTMAgent(simple_task_env, exploration, model=LSTMQNet())
+    agent.save_checkpoint()
     agent.train(10000)
 
     # agent = LSTMAgent(None, None)

@@ -51,20 +51,20 @@ class HisDQNAgent(DQNAgent):
 
 
 def main():
-    simple_task_env = ScoopEnv(port=19997)
-    exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
-    agent = HisDQNAgent(HistoryDQN, env=simple_task_env, exploration=exploration)
-    agent.load_checkpoint('20181201155006')
-    agent.save_checkpoint()
-    agent.train(10000)
-
-    # agent = HisDQNAgent(None, None)
+    # simple_task_env = ScoopEnv(port=19997)
+    # exploration = LinearSchedule(1000, initial_p=1.0, final_p=0.1)
+    # agent = HisDQNAgent(HistoryDQN, env=simple_task_env, exploration=exploration)
     # agent.load_checkpoint('20181201155006')
+    # agent.save_checkpoint()
+    # agent.train(10000)
+
+    agent = HisDQNAgent(HistoryDQN)
+    agent.load_checkpoint('20181201180913')
     # plotLearningCurve(agent.episode_rewards)
     # plt.show()
     # plotLearningCurve(agent.episode_lengths, label='length', color='r')
     # plt.show()
-    # pass
+    pass
 
 
 if __name__ == '__main__':

@@ -31,15 +31,17 @@ class ScoopEnv:
         vrep.simxStartSimulation(self.sim_client, VREP_BLOCKING)
         time.sleep(1)
         # Generate a cube
-        position = self.cube_start_position
-        orientation = [np.radians(90), 0, np.radians(90)]
-        # orientation = [0, 0, 0]
-        size = self.cube_size
-        mass = 0.1
-        color = [255, 0, 0]
-        self.cube = utils.importShape(self.sim_client, 'cube', CUBE_MESH, position, orientation, color)
+        # position = self.cube_start_position
+        # orientation = [np.radians(90), 0, np.radians(90)]
+        # # orientation = [0, 0, 0]
+        # size = self.cube_size
+        # mass = 0.1
+        # color = [255, 0, 0]
+        # self.cube = utils.importShape(self.sim_client, 'cube', CUBE_MESH, position, orientation, color)
         # self.cube = utils.generateShape(self.sim_client, 'cube', 0, size, position, orientation, mass, color)
         # time.sleep(1)
+
+        sim_ret, self.cube = utils.getObjectHandle(self.sim_client, 'cube')
 
         utils.setObjectPosition(self.sim_client, self.ur5.UR5_target, [-0.2, 0.6, 0.07])
 
