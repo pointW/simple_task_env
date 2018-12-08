@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plotLearningCurve(episode_rewards, window=100, label='reward', color='b'):
+def plotLearningCurve(episode_rewards, window=100, label='reward', color='b', shadow=True):
     xs = []
     moving_avg = []
     moving_std = []
@@ -13,8 +13,8 @@ def plotLearningCurve(episode_rewards, window=100, label='reward', color='b'):
 
     moving_avg = np.array(moving_avg)
     moving_std = np.array(moving_std)
-
-    plt.fill_between(xs, moving_avg-moving_std, moving_avg+moving_std, alpha=0.2, color=color)
+    if shadow:
+        plt.fill_between(xs, moving_avg-moving_std, moving_avg+moving_std, alpha=0.2, color=color)
     plt.plot(xs, moving_avg, label=label, color=color)
     plt.legend(loc=4)
 
