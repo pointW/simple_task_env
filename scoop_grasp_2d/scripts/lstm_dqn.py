@@ -41,7 +41,7 @@ if __name__ == '__main__':
     # agent.train(10000)
 
     agent = LSTMDQNAgent(LSTMQNet)
-    agent.load_checkpoint('20181208153502')
+    agent.load_checkpoint('20181209144723')
     plotLearningCurve(agent.episode_rewards)
     plt.show()
     plotLearningCurve(agent.episode_lengths, label='length', color='r')
