@@ -70,4 +70,5 @@ class Agent(DQNAgent):
 if __name__ == '__main__':
     agent = Agent(DQN, model=DQN(), env=ScoopEnv(port=19997),
                   exploration=LinearSchedule(100000, initial_p=1.0, final_p=0.1), batch_size=128)
-    agent.train(10000)
+    agent.load_checkpoint('20190118201202')
+    agent.train(10000, max_episode_steps=200)
